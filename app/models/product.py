@@ -1,6 +1,6 @@
 """
-Pydantic models for Product documents from MongoDB.
-Aligned with the Node.js productModel schema.
+Các Pydantic models(Định nghĩa cấu trúc dữ liệu và validate dữ liệu) dành cho tài liệu Sản phẩm từ MongoDB.
+Được thiết kế tương thích với schema productModel của Node.js.
 """
 from __future__ import annotations
 
@@ -9,14 +9,17 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class Ratings(BaseModel):
+    """Cấu trúc dữ liệu đánh giá sản phẩm."""
     totalRating: float = 0.0
     numberOfRatings: int = 0
 
 
 class ProductBase(BaseModel):
-    """Minimal projection returned from MongoDB for recommendations."""
+    """
+    Dữ liệu sản phẩm tối thiểu lấy từ MongoDB để phục vụ tính toán gợi ý.
+    """
 
-    id: str = Field(alias="_id")
+    id: str = Field(alias="_id")  # Map trường _id của MongoDB vào id
     title: str
     slug: Optional[str] = None
     description: Optional[str] = ""
@@ -27,7 +30,7 @@ class ProductBase(BaseModel):
     price: float = 0.0
     discountPercentage: float = 0.0
     originalPrice: float = 0.0
-    # status field: "active" | "inactive"
+    # status: "active" | "inactive"
     status: Optional[str] = None
     featured: bool = False
     isBestPrice: bool = False
@@ -40,12 +43,13 @@ class ProductBase(BaseModel):
     @field_validator("id", mode="before")
     @classmethod
     def coerce_object_id(cls, v: Any) -> str:
-        """Convert ObjectId or any type to string."""
+        """Chuyển đổi ObjectId (từ MongoDB) thành chuỗi string."""
         return str(v)
 
     @field_validator("primary_category_id", mode="before")
     @classmethod
     def coerce_category_id(cls, v: Any) -> Optional[str]:
+        """Chuyển đổi ID danh mục thành chuỗi string, chấp nhận None."""
         if v is None:
             return None
         return str(v)
@@ -53,6 +57,7 @@ class ProductBase(BaseModel):
     @field_validator("tags", mode="before")
     @classmethod
     def ensure_tags_list(cls, v: Any) -> List[str]:
+        """Đảm bảo trường tags luôn là một danh sách chuỗi."""
         if v is None:
             return []
         if isinstance(v, list):
@@ -62,6 +67,7 @@ class ProductBase(BaseModel):
     @field_validator("images", mode="before")
     @classmethod
     def ensure_images_list(cls, v: Any) -> List[str]:
+        """Đảm bảo trường images luôn là một danh sách chuỗi."""
         if v is None:
             return []
         if isinstance(v, list):
@@ -72,7 +78,10 @@ class ProductBase(BaseModel):
 
 
 class RecommendationItem(BaseModel):
-    """A single recommendation result returned to the client."""
+    """
+    Cấu trúc của một sản phẩm gợi ý trả về cho Client.
+    Bao gồm thêm điểm số tương đồng (similarity_score).
+    """
 
     id: str = Field(alias="_id")
     title: str
@@ -91,7 +100,7 @@ class RecommendationItem(BaseModel):
 
 
 class RecommendationResponse(BaseModel):
-    """API response envelope for recommendation endpoint."""
+    """Cấu trúc phản hồi API cho endpoint gợi ý sản phẩm."""
 
     success: bool = True
     product_id: str
@@ -100,6 +109,7 @@ class RecommendationResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
+    """Cấu trúc phản hồi kiểm tra trạng thái dịch vụ (Health Check)."""
     status: str
     products_cached: int
     matrix_built: bool

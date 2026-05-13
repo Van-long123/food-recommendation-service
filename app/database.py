@@ -1,5 +1,5 @@
 """
-Async MongoDB connection using motor driver.
+Kết nối MongoDB bất đồng bộ bằng driver motor.
 """
 import logging
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
@@ -7,18 +7,24 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Biến toàn cục để lưu trữ client và database instance
 _client: AsyncIOMotorClient | None = None
 _db: AsyncIOMotorDatabase | None = None
 
 
 async def connect_to_mongo() -> None:
-    """Establish MongoDB connection."""
+    """Thiết lập kết nối tới MongoDB."""
     global _client, _db
     try:
+        # Khởi tạo client với URI từ cấu hình, timeout 10 giây
         _client = AsyncIOMotorClient(settings.MONGODB_URI, serverSelectionTimeoutMS=10000)
-        # Ping to verify connection
+        
+        # Kiểm tra kết nối bằng lệnh ping
         await _client.admin.command("ping")
+        
+        # Chọn database
         _db = _client[settings.MONGODB_DB_NAME]
+        
         logger.info(
             "Connected to MongoDB | DB: %s | Collection: %s",
             settings.MONGODB_DB_NAME,
@@ -30,7 +36,7 @@ async def connect_to_mongo() -> None:
 
 
 async def close_mongo_connection() -> None:
-    """Close MongoDB connection."""
+    """Đóng kết nối MongoDB khi ứng dụng dừng."""
     global _client
     if _client is not None:
         _client.close()
@@ -38,13 +44,13 @@ async def close_mongo_connection() -> None:
 
 
 def get_database() -> AsyncIOMotorDatabase:
-    """Return the active database instance."""
+    """Trả về instance database đang hoạt động."""
     if _db is None:
-        raise RuntimeError("Database not initialised. Call connect_to_mongo() first.")
+        raise RuntimeError("Database chưa được khởi tạo. Hãy gọi connect_to_mongo() trước.")
     return _db
 
 
 def get_collection():
-    """Return the products collection."""
+    """Trả về collection 'products' để thao tác dữ liệu sản phẩm."""
     db = get_database()
     return db[settings.MONGODB_COLLECTION]
