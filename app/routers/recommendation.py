@@ -79,6 +79,7 @@ async def get_recommendations(
                 slug=item.get("slug"),
                 price=item["price"],
                 images=item.get("images", []),
+                thumbnail=item.get("thumbnail"),
                 ratings=Ratings(**item["ratings"]),
                 primary_category_id=item.get("primary_category_id"),
                 featured=item.get("featured", False),

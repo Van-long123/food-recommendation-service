@@ -89,6 +89,7 @@ class RecommendationItem(BaseModel):
     price: float
     unit: Optional[str] = None
     images: List[str] = []
+    thumbnail: Optional[str] = None
     ratings: Ratings
     primary_category_id: Optional[str] = None
     featured: bool = False

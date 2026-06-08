@@ -482,6 +482,7 @@ class RecommenderService:
                     "price": p.price,
                     "unit": getattr(p, "unit", None),
                     "images": p.images or [],
+                    "thumbnail": getattr(p, "thumbnail", None),
                     "ratings": p.ratings.model_dump(),
                     "primary_category_id": getattr(p, "primary_category_id", None),
                     "featured": getattr(p, "featured", False),
