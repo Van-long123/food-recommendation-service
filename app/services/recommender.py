@@ -406,9 +406,29 @@ class RecommenderService:
 
         if target_idx is None:
             logger.warning(
-                "product_id=%s không tìm thấy trong danh sách đã nạp", product_id
+                "product_id=%s không tìm thấy trong danh sách đã nạp. Sử dụng fallback (sản phẩm mới nhất).", product_id
             )
-            return [], False
+            # Fallback: Nếu là sản phẩm mới tạo mà chưa kịp sync cache, trả về top_n sản phẩm mới nhất.
+            # Giả sử ObjectId có thể đại diện cho thời gian tạo, sắp xếp giảm dần theo id.
+            fallback_products = sorted(products, key=lambda x: x.id, reverse=True)[:top_n]
+            results: List[dict] = []
+            for p in fallback_products:
+                results.append({
+                    "_id": p.id,
+                    "title": p.title,
+                    "slug": p.slug,
+                    "price": p.price,
+                    "unit": getattr(p, "unit", None),
+                    "images": p.images or [],
+                    "thumbnail": getattr(p, "thumbnail", None),
+                    "ratings": p.ratings.model_dump(),
+                    "primary_category_id": getattr(p, "primary_category_id", None),
+                    "featured": getattr(p, "featured", False),
+                    "isBestPrice": getattr(p, "isBestPrice", False),
+                    "isOnlineExclusive": getattr(p, "isOnlineExclusive", False),
+                    "similarity_score": 0.0,
+                })
+            return results, True
 
         target_product = products[target_idx]
 
