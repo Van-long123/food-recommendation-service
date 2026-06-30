@@ -37,19 +37,8 @@ class RecommenderService:
     """
     Dịch vụ gợi ý dựa trên nội dung sản phẩm.
 
-    Công thức tính điểm (tổng trọng số):
-            final_score = (tier_boost)
-                                    + 1.00 * title_score        (Độ tương đồng tiêu đề)
-                                    + 0.70 * content_score      (Độ tương đồng nội dung TF-IDF)
-                                    + 0.12 * price_similarity   (Sự tương đồng về giá)
-                                    + 0.06 * rating_score       (Điểm đánh giá)
-                                    + 0.04 * popularity_score   (Độ phổ biến)
-                                    + 0.03 * bonus_score        (Điểm thưởng đặc biệt)
-
     Logic phân tầng (Tier):
-        TIER 1 (+10.0): Độ tương đồng nội dung >= SIMILARITY_THRESHOLD
-                        HOẶC tiêu đề khớp Jaccard >= TITLE_SIMILARITY_THRESHOLD.
-                        → Ưu tiên cao nhất, không phân biệt danh mục.
+        TIER 1 (+10.0): Độ tương đồng nội dung cao (cùng loại thực phẩm).
         TIER 2 (+0.0):  Dành cho sản phẩm cùng danh mục khi không đủ sản phẩm Tier 1.
         LOẠI  (-1.0):   Không đủ ngưỡng tương đồng và khác danh mục.
     """
@@ -82,9 +71,6 @@ class RecommenderService:
     def build_corpus(self, products: List[ProductBase]) -> List[str]:
         """
         Tạo tập văn bản từ `title`, `description`, `unit` và token giá.
-        
-        Trọng số trong văn bản:
-            tiêu đề x4, mô tả x2, đơn vị x1, giá x1
         """
         def _price_token(price_val: float) -> str:
             """Chuyển đổi giá tiền thành các phân khúc văn bản để TF-IDF xử lý."""
@@ -202,8 +188,10 @@ class RecommenderService:
         products: List[ProductBase], target_price: float
     ) -> np.ndarray:
         """
-        Tính độ tương đồng về giá bằng hàm Gaussian.
-        Sản phẩm có giá càng gần với sản phẩm mục tiêu thì điểm càng cao.
+        Tính độ tương đồng về giá bằng Hàm phân phối chuẩn Gaussian (Đường cong hình chuông).
+        - Công thức: f(x) = exp(-|giá_x - giá_mục_tiêu| / giá_mục_tiêu)
+        - Ý nghĩa: Giá lệch càng xa thì điểm càng trượt dốc về 0 một cách mượt mà (không bị rớt đột ngột).
+        Sản phẩm có giá càng gần với sản phẩm mục tiêu thì điểm tiệm cận về 1.
         """
         if target_price <= 0:
             return np.ones(len(products))
@@ -218,11 +206,15 @@ class RecommenderService:
             return np.ones(len(products))
         return (scores - scores.min()) / rng
 
+    # hàm Rating là để tìm ra hàng TỐT NHẤT
     @staticmethod
     def compute_rating_score(products: List[ProductBase]) -> np.ndarray:
         """
-        Tính điểm đánh giá theo phong cách Bayesian.
-        Kết hợp cả số điểm trung bình và số lượng đánh giá.
+        Tính điểm đánh giá theo phong cách Bayesian (Làm mịn bằng Logarit).
+        - Công thức: Điểm = (Số Sao / 5.0) * (log(Số lượt đánh giá + 1) / log(Số lượt tối đa + 1))
+        - Ý nghĩa: Giải quyết bài toán "Thiên vị ít dữ liệu". 
+          Sản phẩm 5 sao nhưng chỉ có 1 người đánh giá sẽ bị kéo điểm xuống, 
+          thua sản phẩm 4.8 sao nhưng có tới 1000 người đánh giá (độ tin cậy cao hơn).
         """
         total_ratings = np.array(
             [p.ratings.totalRating for p in products], dtype=float
@@ -241,6 +233,7 @@ class RecommenderService:
             return np.ones(len(products))
         return (scores - scores.min()) / rng
 
+    #  hàm Popularity là để tìm ra hàng BÁN CHẠY NHẤT 
     @staticmethod
     def compute_popularity_score(products: List[ProductBase]) -> np.ndarray:
         """
@@ -277,8 +270,11 @@ class RecommenderService:
     @staticmethod
     def compute_title_similarity(target_title: str, products: List[ProductBase]) -> np.ndarray:
         """
-        Tính độ tương đồng tiêu đề bằng chỉ số Jaccard (tỷ lệ từ chung / tổng số từ).
-        Giúp bắt các sản phẩm có tên gọi giống nhau dù khác danh mục.
+        Tính độ tương đồng tiêu đề bằng Chỉ số Jaccard (Jaccard Index).
+        - Công thức: Điểm = Tập giao (Số từ chung) / Tập hợp (Tổng số từ của cả 2)
+        - Ý nghĩa: Thuật toán AI TF-IDF thường yếu trong việc phát hiện 2 sản phẩm có tên y hệt nhau 
+          nếu mô tả của chúng quá dài và khác nhau. Jaccard giúp "bắt" dính những sản phẩm 
+          cùng tên (Ví dụ: "Cá Hồi Tươi" và "Cá Hồi Đông Lạnh") dù chúng ở 2 danh mục khác biệt.
         """
         target_words = set((target_title or "").lower().split())
         # Loại bỏ các từ dừng thực phẩm (tươi, ngon, kg...)
@@ -487,6 +483,8 @@ class RecommenderService:
 
         # ---- 5. Lấy Top-N kết quả ----
         # Sắp xếp giảm dần và lấy N chỉ mục đầu tiên
+        # np.argsort() trả về "Vị trí" (Index) của các con số đó theo thứ tự từ bé đến lớn.
+        # [::-1]: Đây là cú pháp "Lật ngược mảng" (Reverse)
         top_indices = np.argsort(final_scores)[::-1][:top_n]
 
         results: List[dict] = []

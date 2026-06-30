@@ -40,6 +40,7 @@ class ProductBase(BaseModel):
     primary_category_id: Optional[str] = None
     deleted: bool = False
 
+    # TRƯỚC KHI đổ dữ liệu đó vào cái khuôn (model) của Python.
     @field_validator("id", mode="before")
     @classmethod
     def coerce_object_id(cls, v: Any) -> str:
