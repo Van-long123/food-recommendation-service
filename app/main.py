@@ -110,8 +110,9 @@ app.include_router(recommendation_router)
 
 # Health check - Kiểm tra sức khỏe hệ thống
 
-@app.get(
+@app.api_route(
     "/health",
+    methods=["GET", "HEAD"],
     response_model=HealthResponse,
     tags=["health"],
     summary="Kiểm tra trạng thái dịch vụ",
